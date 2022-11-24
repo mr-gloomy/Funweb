@@ -1,0 +1,88 @@
+package com.itwillbs.order.action;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+
+import com.itwillbs.basket.db.BasketDAO;
+import com.itwillbs.goods.db.GoodsDAO;
+import com.itwillbs.order.db.OrderDAO;
+import com.itwillbs.order.db.OrderDTO;
+
+public class OrderAddAction implements Action {
+
+	@Override
+	public ActionForward execute(HttpServletRequest request,
+			HttpServletResponse response) throws Exception {
+		System.out.println(" M : OrderAddAction_execute() 호출 ");
+		
+		// 세션제어(로그인체크)
+		HttpSession session = request.getSession();
+		String id = (String)session.getAttribute("id");
+		ActionForward forward = new ActionForward();
+		if(id == null) {
+			forward.setPath("./MemberLogin.me");
+			forward.setRedirect(false);
+			return forward;
+		}
+		
+		// 한글처리(생략)
+		// 전달된 주문 정보( 배송지+결제 )
+		// (배송받는 사람, 주소(1,2), 전화번호, 메모
+		//	구매방법, 구매자) + id
+		OrderDTO orDTO = new OrderDTO();
+		orDTO.setO_r_name(request.getParameter("o_r_name"));
+		orDTO.setO_r_addr1(request.getParameter("o_r_addr1"));
+		orDTO.setO_r_addr2(request.getParameter("o_r_addr2"));
+		orDTO.setO_r_phone(request.getParameter("o_r_phone"));
+		orDTO.setO_r_msg(request.getParameter("o_r_msg"));
+		orDTO.setO_trade_payer(request.getParameter("o_t_payer"));
+		orDTO.setO_trade_type(request.getParameter("o_t_type"));
+		orDTO.setO_m_id(id);
+		
+		
+		// 주문 상품정보 (장바구니 + 상품정보) 
+		BasketDAO bkDAO = new BasketDAO();
+		List totalList = bkDAO.getBasketList(id);
+		
+		// 장바구니 정보
+		ArrayList basketList = (ArrayList)totalList.get(0);
+		// 상품정보
+		ArrayList goodsList = (ArrayList)totalList.get(1);
+		
+		// 결제 호출 (JAVA코드)
+		System.out.println(" M : 결제처리 완료! ");
+		
+		// 주문정보 저장(구매한 상품 + 배송 + 주문)
+		OrderDAO orDAO = new OrderDAO();
+		orDAO.addOrder(orDTO, basketList, goodsList);
+		
+		// 메일, 문자 전송
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				for(long i=0;i<10000000000000L;i++); // 숫자 계산만함. 텀만들기!
+					System.out.println(" 메일 전송 완료");
+				}
+			
+		}).start();
+		
+		System.out.println(" 주문정보 저장 완료! ");
+		// 상품개수 수정(판매량)
+		GoodsDAO goDAO = new GoodsDAO();
+		goDAO.updateAmount(basketList);
+		
+		// 장바구니 정보 삭제
+		bkDAO.deleteBasket(id);
+		
+		// 페이지 이동
+		forward.setPath("./OrderList.or");
+		forward.setRedirect(true);
+		
+		return forward;
+	}
+
+}
